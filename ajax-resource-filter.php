@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AJAX Resource Filter with Taxonomy
  * Description: Custom resource post type with AJAX filtering by taxonomy and search
- * Version: 1.0
+ * Version: 1.1
  * Author: Towfique Elahe
  * Author URI: https://towfiqueelahe.com/
  */
@@ -175,11 +175,7 @@ function ajax_resource_filter_shortcode($atts) {
                     <input type="text" name="c" id="rfSearchInput" placeholder="Search resources..."
                         value="<?php echo esc_attr($search_term); ?>" />
                     <button type="submit">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
+                        <i aria-hidden="true" class="jki jki-search-solid"></i>
                     </button>
                 </form>
             </div>
@@ -203,13 +199,6 @@ function ajax_resource_filter_shortcode($atts) {
                     <div class="rf-fgroup" data-group="year">
                         <div class="rf-fhead">
                             Year
-                            <span class="rf-muted">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="open">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                            </span>
                         </div>
                         <div class="rf-fbody open" data-role="year-options">
                             <!-- Will be populated by JavaScript -->
@@ -220,13 +209,6 @@ function ajax_resource_filter_shortcode($atts) {
                     <div class="rf-fgroup" data-group="model">
                         <div class="rf-fhead">
                             Model
-                            <span class="rf-muted">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="open">
-                                    <polyline points="6 9 12 15 18 9"></polyline>
-                                </svg>
-                            </span>
                         </div>
                         <div class="rf-fbody open" data-role="model-options">
                             <!-- Will be populated by JavaScript -->
@@ -277,13 +259,12 @@ function ajax_resource_filter_shortcode($atts) {
 
 <style>
 .rf-wrap {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--e-global-typography-text-font-family), Sans-serif;
 }
 
 .rf-container {
-    max-width: 1400px;
+    width: 100%;
     margin: 0 auto;
-    padding: 20px;
 }
 
 .rf-head {
@@ -296,6 +277,7 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-heading {
+    color: var(--e-global-color-primary);
     font-size: 28px;
     font-weight: 600;
     margin: 0;
@@ -313,9 +295,16 @@ function ajax_resource_filter_shortcode($atts) {
 .rf-searchbar input {
     width: 100%;
     padding: 12px 50px 12px 20px;
-    border: 1px solid #ddd;
+    outline: none;
+    border: 1px solid var(--e-global-color-02b06ea);
     border-radius: 8px;
     font-size: 16px;
+    background-color: var(--e-global-color-7e5b33b);
+    color: var(--e-global-color-18fbe39);
+}
+
+.rf-searchbar input:focus {
+    border-color: var(--e-global-color-primary);
 }
 
 .rf-searchbar button {
@@ -327,7 +316,7 @@ function ajax_resource_filter_shortcode($atts) {
     border: none;
     padding: 0 15px;
     cursor: pointer;
-    color: #666;
+    color: var(--e-global-color-18fbe39);
 }
 
 .rf-grid {
@@ -337,7 +326,8 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-sidebar {
-    border-right: 1px solid #eee;
+    color: var(--e-global-color-text);
+    border-right: 1px solid var(--e-global-color-02b06ea);
     padding-right: 20px;
 }
 
@@ -351,11 +341,18 @@ function ajax_resource_filter_shortcode($atts) {
 
 .rf-sidebar-heading button {
     background: none;
-    border: 1px solid #ddd;
+    border: 1px solid var(--e-global-color-02b06ea);
+    color: var(--e-global-color-text);
     padding: 4px 12px;
     border-radius: 4px;
     cursor: pointer;
     font-size: 14px;
+}
+
+.rf-sidebar-heading button:hover {
+    background: var(--e-global-color-primary);
+    color: var(--e-global-color-18fbe39);
+    border-color: var(--e-global-color-primary);
 }
 
 .rf-fgroup {
@@ -369,17 +366,7 @@ function ajax_resource_filter_shortcode($atts) {
     padding: 10px 0;
     cursor: pointer;
     font-weight: 600;
-    border-bottom: 1px solid #eee;
-}
-
-.rf-fbody {
-    padding: 10px 0;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.rf-fbody:not(.open) {
-    display: none;
+    border-bottom: 1px solid var(--e-global-color-02b06ea);
 }
 
 .rf-check {
@@ -390,6 +377,7 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-check input {
+    accent-color: var(--e-global-color-primary);
     margin-right: 10px;
 }
 
@@ -399,7 +387,7 @@ function ajax_resource_filter_shortcode($atts) {
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--e-global-color-02b06ea);
 }
 
 .rf-count-wrapper {
@@ -411,7 +399,8 @@ function ajax_resource_filter_shortcode($atts) {
 .rf-filter-toggle {
     display: none;
     background: none;
-    border: 1px solid #ddd;
+    color: var(--e-global-color-18fbe39);
+    border: 1px solid var(--e-global-color-02b06ea);
     padding: 8px 15px;
     border-radius: 6px;
     cursor: pointer;
@@ -419,7 +408,7 @@ function ajax_resource_filter_shortcode($atts) {
 
 .rf-count {
     font-size: 14px;
-    color: #666;
+    color: var(--e-global-color-text);
 }
 
 .rf-sort-wrapper {
@@ -435,7 +424,10 @@ function ajax_resource_filter_shortcode($atts) {
 .rf-select select {
     appearance: none;
     padding: 8px 35px 8px 15px;
-    border: 1px solid #ddd;
+    outline: none;
+    background-color: var(--e-global-color-7e5b33b);
+    color: var(--e-global-color-18fbe39);
+    border: 1px solid var(--e-global-color-02b06ea);
     border-radius: 6px;
     font-size: 14px;
     cursor: pointer;
@@ -457,15 +449,14 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-card {
-    border: 1px solid #eee;
+    border: 1px solid var(--e-global-color-02b06ea);
     border-radius: 12px;
     overflow: hidden;
-    transition: transform 0.3s, box-shadow 0.3s;
+    transition: ease .3s;
 }
 
 .rf-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    border-color: var(--e-global-color-primary);
 }
 
 .rf-card-image {
@@ -484,6 +475,7 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-card-title {
+    color: var(--e-global-color-18fbe39);
     font-size: 18px;
     font-weight: 600;
     margin: 0 0 10px 0;
@@ -495,11 +487,11 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-card-title a:hover {
-    color: #0073aa;
+    color: var(--e-global-color-text);
 }
 
 .rf-card-excerpt {
-    color: #666;
+    color: var(--e-global-color-text);
     font-size: 14px;
     line-height: 1.5;
     margin-bottom: 15px;
@@ -509,8 +501,14 @@ function ajax_resource_filter_shortcode($atts) {
     display: flex;
     gap: 15px;
     font-size: 12px;
-    color: #999;
     margin-top: 15px;
+}
+
+.rf-card-meta span {
+    background-color: var(--e-global-color-primary);
+    color: var(--e-global-color-18fbe39);
+    padding: 5px 10px;
+    border-radius: 4px;
 }
 
 .rf-pagination {
@@ -522,16 +520,16 @@ function ajax_resource_filter_shortcode($atts) {
 
 .rf-pagebtn {
     padding: 8px 15px;
-    border: 1px solid #ddd;
-    background: white;
+    border: 1px solid var(--e-global-color-02b06ea);
+    background: var(--e-global-color-7e5b33b);
     border-radius: 6px;
     cursor: pointer;
 }
 
 .rf-pagebtn.active {
-    background: #0073aa;
+    background: var(--e-global-color-primary);
     color: white;
-    border-color: #0073aa;
+    border-color: var(--e-global-color-primary);
 }
 
 .rf-pagebtn:disabled {
@@ -551,7 +549,7 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-muted {
-    color: #999;
+    color: var(--e-global-color-text);
 }
 
 @media (max-width: 992px) {
@@ -565,7 +563,7 @@ function ajax_resource_filter_shortcode($atts) {
         left: -100%;
         width: 280px;
         height: 100%;
-        background: white;
+        background: var(--e-global-color-7e5b33b);
         z-index: 1000;
         padding: 20px;
         transition: left 0.3s;
@@ -583,6 +581,20 @@ function ajax_resource_filter_shortcode($atts) {
 
     .rf-backdrop.active {
         display: block;
+    }
+}
+
+@media (max-width: 767px) {
+    .rf-head {
+        flex-direction: column;
+    }
+
+    .rf-searchbar {
+        width: 100%;
+    }
+
+    .rf-sort-wrapper .rf-muted {
+        display: none;
     }
 }
 </style>
@@ -668,20 +680,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.backdrop.classList.remove('active');
                 });
             }
-
-            // Collapsible filter groups
-            this.root.querySelectorAll('.rf-fhead').forEach(head => {
-                head.addEventListener('click', () => {
-                    const body = head.parentElement.querySelector('.rf-fbody');
-                    const icon = head.querySelector('svg');
-                    body.classList.toggle('open');
-                    if (icon) {
-                        icon.style.transform = body.classList.contains('open') ?
-                            'translateY(-50%) rotate(180deg)' :
-                            'translateY(-50%)';
-                    }
-                });
-            });
         }
 
         getFilters() {
@@ -813,11 +811,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             <h3 class="rf-card-title">
                                 <a href="${resource.link}">${resource.title}</a>
                             </h3>
-                            <div class="rf-card-excerpt">${resource.excerpt}</div>
+                            <div class="rf-card-excerpt">${resource.excerpt.length > 100 ? resource.excerpt.substring(0, 100) + '...' : resource.excerpt}</div>
                             <div class="rf-card-meta">
                                 ${years ? `<span>Year: ${years}</span>` : ''}
                                 ${models ? `<span>Model: ${models}</span>` : ''}
-                                <span>${date}</span>
                             </div>
                         </div>
                     </article>
