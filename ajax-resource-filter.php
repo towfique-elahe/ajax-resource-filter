@@ -319,6 +319,10 @@ function ajax_resource_filter_shortcode($atts) {
     color: var(--e-global-color-18fbe39);
 }
 
+.rf-searchbar button:hover {
+    background: var(--e-global-color-primary);
+}
+
 .rf-grid {
     display: grid;
     grid-template-columns: 280px 1fr;
@@ -460,6 +464,7 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-card-image {
+    display: block;
     height: 180px;
     overflow: hidden;
 }
@@ -481,13 +486,13 @@ function ajax_resource_filter_shortcode($atts) {
     margin: 0 0 10px 0;
 }
 
+.rf-card-title:hover {
+    color: var(--e-global-color-primary);
+}
+
 .rf-card-title a {
     color: inherit;
     text-decoration: none;
-}
-
-.rf-card-title a:hover {
-    color: var(--e-global-color-text);
 }
 
 .rf-card-excerpt {
@@ -890,9 +895,9 @@ document.addEventListener('DOMContentLoaded', function() {
             return `
                     <article class="rf-card">
                         ${resource.image ? `
-                            <div class="rf-card-image">
+                            <a class="rf-card-image" href="${resource.link}">
                                 <img src="${resource.image}" alt="${resource.title}">
-                            </div>
+                            </a>
                         ` : ''}
                         <div class="rf-card-content">
                             <h3 class="rf-card-title">
@@ -900,8 +905,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             </h3>
                             <div class="rf-card-excerpt">${resource.excerpt.length > 100 ? resource.excerpt.substring(0, 100) + '...' : resource.excerpt}</div>
                             <div class="rf-card-meta">
-                                ${years ? `<span>Year of Make: ${years}</span>` : ''}
-                                ${models ? `<span>Car Model: ${models}</span>` : ''}
+                                ${years ? `<span>Year: ${years}</span>` : ''}
+                                ${models ? `<span>Model: ${models}</span>` : ''}
                             </div>
                         </div>
                     </article>
