@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AJAX Resource Filter with Taxonomy
  * Description: Custom resource post type with AJAX filtering by taxonomy and search
- * Version: 1.1
+ * Version: 1.2
  * Author: Towfique Elahe
  * Author URI: https://towfiqueelahe.com/
  */
@@ -612,6 +612,9 @@ document.addEventListener('DOMContentLoaded', function() {
             this.sidebar = root.querySelector('.rf-sidebar');
             this.backdrop = root.querySelector('.rf-backdrop');
             this.filterToggle = root.querySelector('.rf-filter-toggle');
+            this.searchInput = root.querySelector('#rfSearchInput');
+            this.searchForm = root.querySelector('#rfSearchForm');
+            this.heading = root.querySelector('.rf-heading');
 
             this.resources = [];
             this.state = {
@@ -622,12 +625,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 searchTerm: '<?php echo esc_js($search_term); ?>'
             };
 
+            // Search debouncing
+            this.searchTimeout = null;
+            this.searchDelay = 300; // milliseconds
+
             this.init();
         }
 
         init() {
             this.setupEventListeners();
             this.fetchResources();
+
+            // Update heading based on search term
+            if (this.state.searchTerm && this.heading) {
+                this.heading.textContent = `Search results for "${this.state.searchTerm}"`;
+            }
         }
 
         setupEventListeners() {
@@ -680,6 +692,61 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.backdrop.classList.remove('active');
                 });
             }
+
+            // Real-time search input
+            if (this.searchInput) {
+                this.searchInput.addEventListener('input', (e) => {
+                    this.handleSearchInput(e.target.value.trim());
+                });
+
+                // Also handle form submit to prevent page reload
+                if (this.searchForm) {
+                    this.searchForm.addEventListener('submit', (e) => {
+                        e.preventDefault();
+                        this.handleSearchInput(this.searchInput.value.trim());
+                    });
+                }
+            }
+        }
+
+        handleSearchInput(term) {
+            // Clear previous timeout
+            if (this.searchTimeout) {
+                clearTimeout(this.searchTimeout);
+            }
+
+            // Set new timeout for debouncing
+            this.searchTimeout = setTimeout(() => {
+                this.state.searchTerm = term;
+                this.state.page = 1;
+
+                // Update heading
+                if (this.heading) {
+                    if (term) {
+                        this.heading.textContent = `Search results for "${term}"`;
+                    } else {
+                        this.heading.textContent = 'Browse All Resources';
+                    }
+                }
+
+                // Update URL without page reload (optional - adds to browser history)
+                this.updateBrowserUrl(term);
+
+                // Re-render results
+                this.render();
+            }, this.searchDelay);
+        }
+
+        updateBrowserUrl(searchTerm) {
+            const baseUrl = this.root.dataset.archiveUrl || window.location.pathname;
+            let newUrl = baseUrl;
+
+            if (searchTerm) {
+                newUrl = `${baseUrl}?c=${encodeURIComponent(searchTerm)}`;
+            }
+
+            // Update browser URL without reloading page
+            window.history.replaceState({}, '', newUrl);
         }
 
         getFilters() {
@@ -707,6 +774,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (filters.model.length > 0) {
                     const resourceModels = resource.models.map(m => m.name);
                     if (!filters.model.some(model => resourceModels.includes(model))) {
+                        return false;
+                    }
+                }
+
+                // Search filter
+                if (this.state.searchTerm) {
+                    const term = this.state.searchTerm.toLowerCase();
+                    const titleMatch = resource.title.toLowerCase().includes(term);
+                    const excerptMatch = resource.excerpt.toLowerCase().includes(term);
+
+                    // Also search in year and model names
+                    const yearMatch = resource.years.some(y =>
+                        y.name.toLowerCase().includes(term)
+                    );
+                    const modelMatch = resource.models.some(m =>
+                        m.name.toLowerCase().includes(term)
+                    );
+
+                    if (!(titleMatch || excerptMatch || yearMatch || modelMatch)) {
                         return false;
                     }
                 }
@@ -824,15 +910,6 @@ document.addEventListener('DOMContentLoaded', function() {
         render() {
             let filtered = this.applyFilters(this.resources);
 
-            // Apply search if exists
-            if (this.state.searchTerm) {
-                const term = this.state.searchTerm.toLowerCase();
-                filtered = filtered.filter(resource =>
-                    resource.title.toLowerCase().includes(term) ||
-                    resource.excerpt.toLowerCase().includes(term)
-                );
-            }
-
             filtered = this.sortResources(filtered);
             const pagination = this.paginate(filtered);
             this.state.pages = pagination.pages;
@@ -844,8 +921,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Update count
             if (this.countEl) {
-                this.countEl.textContent =
+                const countText = this.state.searchTerm ?
+                    `${pagination.total} result${pagination.total === 1 ? '' : 's'} for "${this.state.searchTerm}"` :
                     `${pagination.total} resource${pagination.total === 1 ? '' : 's'}`;
+                this.countEl.textContent = countText;
             }
 
             // Update pagination
@@ -858,20 +937,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 input.checked = false;
             });
 
-            // Reset to first page
+            // Clear search input
+            if (this.searchInput) {
+                this.searchInput.value = '';
+            }
+
+            // Reset state
+            this.state.searchTerm = '';
             this.state.page = 1;
 
-            // Clear search if we're on search page
-            const searchForm = this.root.querySelector('#rfSearchForm');
-            const searchInput = this.root.querySelector('#rfSearchInput');
-
-            if (window.location.search.includes('c=')) {
-                // If we have search term in URL, redirect to clean archive
-                window.location.href = this.root.dataset.archiveUrl;
-            } else {
-                // Otherwise just re-render
-                this.render();
+            // Update heading
+            if (this.heading) {
+                this.heading.textContent = 'Browse All Resources';
             }
+
+            // Clear URL parameter
+            this.updateBrowserUrl('');
+
+            // Re-render
+            this.render();
         }
 
         async fetchResources() {
@@ -941,24 +1025,6 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.rf-wrap').forEach(wrap => {
         new ResourceFilter(wrap);
     });
-
-    // Search form handler
-    const searchForm = document.querySelector('#rfSearchForm');
-    const searchInput = document.querySelector('#rfSearchInput');
-
-    if (searchForm && searchInput) {
-        searchForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const term = searchInput.value.trim();
-            const archiveUrl = document.querySelector('.rf-wrap')?.dataset.archiveUrl || '/resources/';
-
-            if (term) {
-                window.location.href = `${archiveUrl}?c=${encodeURIComponent(term)}`;
-            } else {
-                window.location.href = archiveUrl;
-            }
-        });
-    }
 });
 </script>
 <?php
