@@ -138,7 +138,7 @@ function ajax_resource_filter_register_rest_fields() {
     register_rest_field('resource', 'featured_image_url', [
         'get_callback' => function($object) {
             $image_id = get_post_thumbnail_id($object['id']);
-            return $image_id ? wp_get_attachment_image_url($image_id, 'medium') : '';
+            return $image_id ? wp_get_attachment_image_url($image_id, 'large') : '';
         },
         'schema' => ['type' => 'string'],
     ]);
@@ -198,7 +198,7 @@ function ajax_resource_filter_shortcode($atts) {
                     <!-- Year Filter -->
                     <div class="rf-fgroup" data-group="year">
                         <div class="rf-fhead">
-                            Year
+                            Year of Make
                         </div>
                         <div class="rf-fbody open" data-role="year-options">
                             <!-- Will be populated by JavaScript -->
@@ -208,7 +208,7 @@ function ajax_resource_filter_shortcode($atts) {
                     <!-- Model Filter -->
                     <div class="rf-fgroup" data-group="model">
                         <div class="rf-fhead">
-                            Model
+                            Car Model
                         </div>
                         <div class="rf-fbody open" data-role="model-options">
                             <!-- Will be populated by JavaScript -->
@@ -500,6 +500,7 @@ function ajax_resource_filter_shortcode($atts) {
 .rf-card-meta {
     display: flex;
     gap: 15px;
+    flex-wrap: wrap;
     font-size: 12px;
     margin-top: 15px;
 }
@@ -899,8 +900,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             </h3>
                             <div class="rf-card-excerpt">${resource.excerpt.length > 100 ? resource.excerpt.substring(0, 100) + '...' : resource.excerpt}</div>
                             <div class="rf-card-meta">
-                                ${years ? `<span>Year: ${years}</span>` : ''}
-                                ${models ? `<span>Model: ${models}</span>` : ''}
+                                ${years ? `<span>Year of Make: ${years}</span>` : ''}
+                                ${models ? `<span>Car Model: ${models}</span>` : ''}
                             </div>
                         </div>
                     </article>
