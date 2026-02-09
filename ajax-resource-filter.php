@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AJAX Resource Filter with Taxonomy
  * Description: Custom resource post type with AJAX filtering by taxonomy and search
- * Version: 1.2
+ * Version: 1.3
  * Author: Towfique Elahe
  * Author URI: https://towfiqueelahe.com/
  */
@@ -170,15 +170,6 @@ function ajax_resource_filter_shortcode($atts) {
             <h3 class="rf-heading">
                 <?php echo $search_term ? 'Search results for "' . esc_html($search_term) . '"' : 'Browse All Resources'; ?>
             </h3>
-            <div class="rf-searchbar">
-                <form id="rfSearchForm" method="get" action="<?php echo esc_url(home_url('/resources/')); ?>">
-                    <input type="text" name="c" id="rfSearchInput" placeholder="Search resources..."
-                        value="<?php echo esc_attr($search_term); ?>" />
-                    <button type="submit">
-                        <i aria-hidden="true" class="jki jki-search-solid"></i>
-                    </button>
-                </form>
-            </div>
         </div>
 
         <div class="rf-grid">
@@ -194,23 +185,42 @@ function ajax_resource_filter_shortcode($atts) {
                     <button data-action="clear">Clear filters</button>
                 </h4>
 
+                <!-- Search moved to sidebar -->
+                <div class="rf-searchbar">
+                    <form id="rfSearchForm" method="get" action="<?php echo esc_url(home_url('/resources/')); ?>">
+                        <input type="text" name="c" id="rfSearchInput" placeholder="Search resources..."
+                            value="<?php echo esc_attr($search_term); ?>" />
+                        <button type="submit">
+                            <i aria-hidden="true" class="jki jki-search-solid"></i>
+                        </button>
+                    </form>
+                </div>
+
                 <div class="rf-filter-container">
                     <!-- Year Filter -->
                     <div class="rf-fgroup" data-group="year">
-                        <div class="rf-fhead">
-                            Year of Make
+                        <div class="rf-fhead" data-toggle="year-options">
+                            <span>Year of Make</span>
+                            <svg class="rf-fhead-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
                         </div>
-                        <div class="rf-fbody open" data-role="year-options">
+                        <div class="rf-fbody" data-role="year-options">
                             <!-- Will be populated by JavaScript -->
                         </div>
                     </div>
 
                     <!-- Model Filter -->
                     <div class="rf-fgroup" data-group="model">
-                        <div class="rf-fhead">
-                            Car Model
+                        <div class="rf-fhead" data-toggle="model-options">
+                            <span>Car Model</span>
+                            <svg class="rf-fhead-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
                         </div>
-                        <div class="rf-fbody open" data-role="model-options">
+                        <div class="rf-fbody" data-role="model-options">
                             <!-- Will be populated by JavaScript -->
                         </div>
                     </div>
@@ -268,12 +278,7 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 30px;
-    flex-wrap: wrap;
-    gap: 20px;
 }
 
 .rf-heading {
@@ -284,8 +289,7 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-searchbar {
-    flex: 1;
-    max-width: 400px;
+    margin-bottom: 20px;
 }
 
 .rf-searchbar form {
@@ -360,24 +364,56 @@ function ajax_resource_filter_shortcode($atts) {
 }
 
 .rf-fgroup {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
+    border: 1px solid var(--e-global-color-02b06ea);
+    border-radius: 8px;
+    overflow: hidden;
 }
 
 .rf-fhead {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
+    padding: 12px 15px;
     cursor: pointer;
     font-weight: 600;
-    border-bottom: 1px solid var(--e-global-color-02b06ea);
+    background-color: var(--e-global-color-7e5b33b);
+    user-select: none;
+}
+
+.rf-fhead:hover {
+    background-color: var(--e-global-color-02b06ea);
+}
+
+.rf-fhead-icon {
+    transition: transform 0.3s ease;
+}
+
+.rf-fgroup.open .rf-fhead-icon {
+    transform: rotate(180deg);
+}
+
+.rf-fbody {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background-color: var(--e-global-color-7e5b33b);
+}
+
+.rf-fgroup.open .rf-fbody {
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 .rf-check {
     display: flex;
     align-items: center;
-    padding: 8px 0;
+    padding: 10px 15px;
     cursor: pointer;
+}
+
+.rf-check:hover {
+    background-color: var(--e-global-color-02b06ea);
 }
 
 .rf-check input {
@@ -595,10 +631,6 @@ function ajax_resource_filter_shortcode($atts) {
         flex-direction: column;
     }
 
-    .rf-searchbar {
-        width: 100%;
-    }
-
     .rf-sort-wrapper .rf-muted {
         display: none;
     }
@@ -672,6 +704,16 @@ document.addEventListener('DOMContentLoaded', function() {
             this.root.addEventListener('click', (e) => {
                 if (e.target.closest('[data-action="clear"]')) {
                     this.clearFilters();
+                }
+
+                // Toggle filter sections
+                const fhead = e.target.closest('.rf-fhead');
+                if (fhead) {
+                    const toggle = fhead.dataset.toggle;
+                    if (toggle) {
+                        const fgroup = fhead.closest('.rf-fgroup');
+                        fgroup.classList.toggle('open');
+                    }
                 }
 
                 // Pagination
