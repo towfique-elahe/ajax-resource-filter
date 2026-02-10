@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AJAX Resource Filter with Taxonomy
  * Description: Custom resource post type with AJAX filtering by taxonomy and search
- * Version: 1.3
+ * Version: 1.4
  * Author: Towfique Elahe
  * Author URI: https://towfiqueelahe.com/
  */
@@ -37,25 +37,25 @@ function ajax_resource_filter_register_cpt() {
         'show_in_rest' => true,
     ]);
 
-    // Register Resource Year taxonomy
-    register_taxonomy('resource-year', 'resource', [
+    // Register Resource Make taxonomy
+    register_taxonomy('resource-make', 'resource', [
         'labels' => [
-            'name' => 'Years',
-            'singular_name' => 'Year',
-            'search_items' => 'Search Years',
-            'all_items' => 'All Years',
-            'parent_item' => 'Parent Year',
-            'parent_item_colon' => 'Parent Year:',
-            'edit_item' => 'Edit Year',
-            'update_item' => 'Update Year',
-            'add_new_item' => 'Add New Year',
-            'new_item_name' => 'New Year Name',
+            'name' => 'Makes',
+            'singular_name' => 'Make',
+            'search_items' => 'Search Makes',
+            'all_items' => 'All Makes',
+            'parent_item' => 'Parent Make',
+            'parent_item_colon' => 'Parent Make:',
+            'edit_item' => 'Edit Make',
+            'update_item' => 'Update Make',
+            'add_new_item' => 'Add New Make',
+            'new_item_name' => 'New Make Name',
         ],
         'hierarchical' => false,
         'show_ui' => true,
         'show_admin_column' => true,
         'query_var' => true,
-        'rewrite' => ['slug' => 'resource-year'],
+        'rewrite' => ['slug' => 'resource-make'],
         'show_in_rest' => true,
     ]);
 
@@ -80,6 +80,28 @@ function ajax_resource_filter_register_cpt() {
         'rewrite' => ['slug' => 'resource-model'],
         'show_in_rest' => true,
     ]);
+
+    // Register Resource Year taxonomy
+    register_taxonomy('resource-year', 'resource', [
+        'labels' => [
+            'name' => 'Years',
+            'singular_name' => 'Year',
+            'search_items' => 'Search Years',
+            'all_items' => 'All Years',
+            'parent_item' => 'Parent Year',
+            'parent_item_colon' => 'Parent Year:',
+            'edit_item' => 'Edit Year',
+            'update_item' => 'Update Year',
+            'add_new_item' => 'Add New Year',
+            'new_item_name' => 'New Year Name',
+        ],
+        'hierarchical' => false,
+        'show_ui' => true,
+        'show_admin_column' => true,
+        'query_var' => true,
+        'rewrite' => ['slug' => 'resource-year'],
+        'show_in_rest' => true,
+    ]);
 }
 
 // Add rewrite rules for search
@@ -100,9 +122,9 @@ function ajax_resource_filter_activate() {
 add_action('rest_api_init', 'ajax_resource_filter_register_rest_fields');
 function ajax_resource_filter_register_rest_fields() {
     // Add taxonomies to REST response
-    register_rest_field('resource', 'resource_years', [
+    register_rest_field('resource', 'resource_makes', [
         'get_callback' => function($object) {
-            $terms = get_the_terms($object['id'], 'resource-year');
+            $terms = get_the_terms($object['id'], 'resource-make');
             if (empty($terms) || is_wp_error($terms)) {
                 return [];
             }
@@ -120,6 +142,23 @@ function ajax_resource_filter_register_rest_fields() {
     register_rest_field('resource', 'resource_models', [
         'get_callback' => function($object) {
             $terms = get_the_terms($object['id'], 'resource-model');
+            if (empty($terms) || is_wp_error($terms)) {
+                return [];
+            }
+            return array_map(function ($t) {
+                return [
+                    'id' => $t->term_id,
+                    'name' => $t->name,
+                    'slug' => $t->slug,
+                ];
+            }, $terms);
+        },
+        'schema' => ['type' => 'array'],
+    ]);
+
+    register_rest_field('resource', 'resource_years', [
+        'get_callback' => function($object) {
+            $terms = get_the_terms($object['id'], 'resource-year');
             if (empty($terms) || is_wp_error($terms)) {
                 return [];
             }
@@ -197,21 +236,21 @@ function ajax_resource_filter_shortcode($atts) {
                 </div>
 
                 <div class="rf-filter-container">
-                    <!-- Year Filter -->
-                    <div class="rf-fgroup" data-group="year">
-                        <div class="rf-fhead" data-toggle="year-options">
-                            <span>Year of Make</span>
+                    <!-- Make Filter (First) -->
+                    <div class="rf-fgroup" data-group="make">
+                        <div class="rf-fhead" data-toggle="make-options">
+                            <span>Car Make</span>
                             <svg class="rf-fhead-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                         </div>
-                        <div class="rf-fbody" data-role="year-options">
+                        <div class="rf-fbody" data-role="make-options">
                             <!-- Will be populated by JavaScript -->
                         </div>
                     </div>
 
-                    <!-- Model Filter -->
+                    <!-- Model Filter (Second) -->
                     <div class="rf-fgroup" data-group="model">
                         <div class="rf-fhead" data-toggle="model-options">
                             <span>Car Model</span>
@@ -221,6 +260,20 @@ function ajax_resource_filter_shortcode($atts) {
                             </svg>
                         </div>
                         <div class="rf-fbody" data-role="model-options">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Year Filter (Third) -->
+                    <div class="rf-fgroup" data-group="year">
+                        <div class="rf-fhead" data-toggle="year-options">
+                            <span>Year of Make</span>
+                            <svg class="rf-fhead-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="rf-fbody" data-role="year-options">
                             <!-- Will be populated by JavaScript -->
                         </div>
                     </div>
@@ -799,7 +852,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         getFilters() {
             const filters = {};
-            ['year', 'model'].forEach(group => {
+            ['make', 'model', 'year'].forEach(group => {
                 const inputs = this.sidebar.querySelectorAll(`input[name="${group}"]:checked`);
                 filters[group] = Array.from(inputs).map(input => input.value);
             });
@@ -810,10 +863,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const filters = this.getFilters();
 
             return resources.filter(resource => {
-                // Year filter
-                if (filters.year.length > 0) {
-                    const resourceYears = resource.years.map(y => y.name);
-                    if (!filters.year.some(year => resourceYears.includes(year))) {
+                // Make filter
+                if (filters.make.length > 0) {
+                    const resourceMakes = resource.makes.map(m => m.name);
+                    if (!filters.make.some(make => resourceMakes.includes(make))) {
                         return false;
                     }
                 }
@@ -826,21 +879,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
+                // Year filter
+                if (filters.year.length > 0) {
+                    const resourceYears = resource.years.map(y => y.name);
+                    if (!filters.year.some(year => resourceYears.includes(year))) {
+                        return false;
+                    }
+                }
+
                 // Search filter
                 if (this.state.searchTerm) {
                     const term = this.state.searchTerm.toLowerCase();
                     const titleMatch = resource.title.toLowerCase().includes(term);
                     const excerptMatch = resource.excerpt.toLowerCase().includes(term);
 
-                    // Also search in year and model names
-                    const yearMatch = resource.years.some(y =>
-                        y.name.toLowerCase().includes(term)
+                    // Also search in make, model, and year names
+                    const makeMatch = resource.makes.some(m =>
+                        m.name.toLowerCase().includes(term)
                     );
                     const modelMatch = resource.models.some(m =>
                         m.name.toLowerCase().includes(term)
                     );
+                    const yearMatch = resource.years.some(y =>
+                        y.name.toLowerCase().includes(term)
+                    );
 
-                    if (!(titleMatch || excerptMatch || yearMatch || modelMatch)) {
+                    if (!(titleMatch || excerptMatch || makeMatch || modelMatch || yearMatch)) {
                         return false;
                     }
                 }
@@ -926,8 +990,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         createResourceCard(resource) {
-            const years = resource.years.map(y => y.name).join(', ');
+            const makes = resource.makes.map(m => m.name).join(', ');
             const models = resource.models.map(m => m.name).join(', ');
+            const years = resource.years.map(y => y.name).join(', ');
             const date = new Date(resource.date).toLocaleDateString('en-US', {
                 year: 'numeric',
                 month: 'short',
@@ -947,8 +1012,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             </h3>
                             <div class="rf-card-excerpt">${resource.excerpt.length > 100 ? resource.excerpt.substring(0, 100) + '...' : resource.excerpt}</div>
                             <div class="rf-card-meta">
-                                ${years ? `<span>Year: ${years}</span>` : ''}
+                                ${makes ? `<span>Make: ${makes}</span>` : ''}
                                 ${models ? `<span>Model: ${models}</span>` : ''}
+                                ${years ? `<span>Year: ${years}</span>` : ''}
                             </div>
                         </div>
                     </article>
@@ -1018,11 +1084,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     link: resource.link,
                     date: resource.date,
                     image: resource.featured_image_url || '',
-                    years: resource.resource_years || [],
-                    models: resource.resource_models || []
+                    makes: resource.resource_makes || [],
+                    models: resource.resource_models || [],
+                    years: resource.resource_years || []
                 }));
 
-                // Populate filter options
+                // Populate filter options in order: Make, Model, Year
                 this.populateFilterOptions();
                 this.render();
 
@@ -1034,28 +1101,30 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         populateFilterOptions() {
-            // Collect all unique years and models
-            const allYears = new Set();
+            // Collect all unique makes, models, and years
+            const allMakes = new Set();
             const allModels = new Set();
+            const allYears = new Set();
 
             this.resources.forEach(resource => {
-                resource.years.forEach(year => allYears.add(year.name));
+                resource.makes.forEach(make => allMakes.add(make.name));
                 resource.models.forEach(model => allModels.add(model.name));
+                resource.years.forEach(year => allYears.add(year.name));
             });
 
-            // Populate year filter
-            const yearContainer = this.sidebar.querySelector('[data-role="year-options"]');
-            if (yearContainer) {
-                const sortedYears = Array.from(allYears).sort();
-                yearContainer.innerHTML = sortedYears.map(year => `
+            // Populate make filter (first)
+            const makeContainer = this.sidebar.querySelector('[data-role="make-options"]');
+            if (makeContainer) {
+                const sortedMakes = Array.from(allMakes).sort();
+                makeContainer.innerHTML = sortedMakes.map(make => `
                         <label class="rf-check">
-                            <input type="checkbox" name="year" value="${year}">
-                            ${year}
+                            <input type="checkbox" name="make" value="${make}">
+                            ${make}
                         </label>
                     `).join('');
             }
 
-            // Populate model filter
+            // Populate model filter (second)
             const modelContainer = this.sidebar.querySelector('[data-role="model-options"]');
             if (modelContainer) {
                 const sortedModels = Array.from(allModels).sort();
@@ -1063,6 +1132,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         <label class="rf-check">
                             <input type="checkbox" name="model" value="${model}">
                             ${model}
+                        </label>
+                    `).join('');
+            }
+
+            // Populate year filter (third)
+            const yearContainer = this.sidebar.querySelector('[data-role="year-options"]');
+            if (yearContainer) {
+                const sortedYears = Array.from(allYears).sort((a, b) => b -
+                a); // Sort years descending (newest first)
+                yearContainer.innerHTML = sortedYears.map(year => `
+                        <label class="rf-check">
+                            <input type="checkbox" name="year" value="${year}">
+                            ${year}
                         </label>
                     `).join('');
             }
@@ -1102,4 +1184,3 @@ function ajax_resource_filter_archive_content($content) {
 
 // Add shortcode support in widgets
 add_filter('widget_text', 'do_shortcode');
-?>
