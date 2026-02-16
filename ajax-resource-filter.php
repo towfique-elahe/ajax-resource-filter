@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: AJAX Resource Filter with Taxonomy
- * Description: Custom resource post type with AJAX filtering by hierarchical taxonomy (Make → Model → Year)
- * Version: 2.0
+ * Description: Custom resource post type with AJAX filtering by hierarchical taxonomy (Make → Model → Year) - Single Selection
+ * Version: 2.3
  * Author: Towfique Elahe
  * Author URI: https://towfiqueelahe.com/
  */
@@ -52,7 +52,7 @@ function ajax_resource_filter_register_cpt() {
             'new_item_name' => 'New Category Name',
             'menu_name' => 'Categories',
         ],
-        'hierarchical' => true, // This enables parent/child relationships
+        'hierarchical' => true,
         'show_ui' => true,
         'show_admin_column' => true,
         'query_var' => true,
@@ -113,6 +113,23 @@ function ajax_resource_filter_register_rest_fields() {
             }
             
             return $formatted_terms;
+        },
+        'schema' => ['type' => 'array'],
+    ]);
+
+    // Add all taxonomy terms for easier searching
+    register_rest_field('resource', 'all_category_names', [
+        'get_callback' => function($object) {
+            $terms = get_the_terms($object['id'], 'resource-category');
+            if (empty($terms) || is_wp_error($terms)) {
+                return [];
+            }
+            
+            $names = [];
+            foreach ($terms as $term) {
+                $names[] = $term->name;
+            }
+            return $names;
         },
         'schema' => ['type' => 'array'],
     ]);
@@ -180,7 +197,7 @@ function ajax_resource_filter_shortcode($atts) {
                 </div>
 
                 <div class="rf-filter-container">
-                    <!-- Make Filter (Level 1) -->
+                    <!-- Make Filter (Level 1) - Radio Buttons -->
                     <div class="rf-fgroup" data-group="make">
                         <div class="rf-fhead" data-toggle="make-options">
                             <span>Car Make</span>
@@ -194,7 +211,7 @@ function ajax_resource_filter_shortcode($atts) {
                         </div>
                     </div>
 
-                    <!-- Model Filter (Level 2) -->
+                    <!-- Model Filter (Level 2) - Radio Buttons -->
                     <div class="rf-fgroup" data-group="model">
                         <div class="rf-fhead" data-toggle="model-options">
                             <span>Car Model</span>
@@ -208,7 +225,7 @@ function ajax_resource_filter_shortcode($atts) {
                         </div>
                     </div>
 
-                    <!-- Year Filter (Level 3) -->
+                    <!-- Year Filter (Level 3) - Radio Buttons -->
                     <div class="rf-fgroup" data-group="year">
                         <div class="rf-fhead" data-toggle="year-options">
                             <span>Year of Make</span>
@@ -400,25 +417,28 @@ function ajax_resource_filter_shortcode($atts) {
 .rf-fgroup.open .rf-fbody {
     max-height: 300px;
     overflow-y: auto;
+    padding: 5px 0;
 }
 
-.rf-check {
+.rf-radio {
     display: flex;
     align-items: center;
-    padding: 10px 15px;
+    padding: 8px 15px;
     cursor: pointer;
+    transition: background-color 0.2s;
 }
 
-.rf-check:hover {
+.rf-radio:hover {
     background-color: var(--e-global-color-02b06ea);
 }
 
-.rf-check input {
+.rf-radio input[type="radio"] {
     accent-color: var(--e-global-color-primary);
     margin-right: 10px;
+    cursor: pointer;
 }
 
-.rf-check.disabled {
+.rf-radio.disabled {
     opacity: 0.5;
     pointer-events: none;
 }
@@ -641,7 +661,7 @@ function ajax_resource_filter_shortcode($atts) {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Main Resource Filter Component with Hierarchical Taxonomy
+    // Main Resource Filter Component with Hierarchical Taxonomy - Single Selection (No "All" options)
     class ResourceFilter {
         constructor(root) {
             this.root = root;
@@ -670,12 +690,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 pages: 1,
                 searchTerm: '<?php echo esc_js($search_term); ?>',
                 selectedMake: '',
-                selectedModel: ''
+                selectedModel: '',
+                selectedYear: ''
             };
 
             // Search debouncing
             this.searchTimeout = null;
-            this.searchDelay = 300; // milliseconds
+            this.searchDelay = 300;
 
             this.init();
         }
@@ -684,7 +705,6 @@ document.addEventListener('DOMContentLoaded', function() {
             this.setupEventListeners();
             this.fetchResources();
 
-            // Update heading based on search term
             if (this.state.searchTerm && this.heading) {
                 this.heading.textContent = `Search results for "${this.state.searchTerm}"`;
             }
@@ -700,20 +720,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            // Filter changes - using event delegation for dynamically created checkboxes
+            // Radio button changes
             if (this.sidebar) {
                 this.sidebar.addEventListener('change', (e) => {
                     if (e.target.matches('input[name="make"]')) {
-                        this.handleMakeChange();
+                        this.handleMakeChange(e.target.value);
                     }
 
                     if (e.target.matches('input[name="model"]')) {
-                        this.handleModelChange();
+                        this.handleModelChange(e.target.value);
                     }
 
                     if (e.target.matches('input[name="year"]')) {
-                        this.state.page = 1;
-                        this.render();
+                        this.handleYearChange(e.target.value);
                     }
                 });
             }
@@ -759,80 +778,76 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            // Real-time search input
+            // Search input - FIXED: Proper search handling
             if (this.searchInput) {
                 this.searchInput.addEventListener('input', (e) => {
-                    this.handleSearchInput(e.target.value.trim());
+                    this.handleSearchInput(e.target.value);
                 });
 
-                // Also handle form submit to prevent page reload
                 if (this.searchForm) {
                     this.searchForm.addEventListener('submit', (e) => {
                         e.preventDefault();
-                        this.handleSearchInput(this.searchInput.value.trim());
+                        this.handleSearchInput(this.searchInput.value);
                     });
                 }
             }
         }
 
-        handleMakeChange() {
-            // Get selected makes
-            const selectedMakes = Array.from(this.sidebar.querySelectorAll('input[name="make"]:checked'))
-                .map(cb => cb.value);
-
-            // Update state
-            this.state.selectedMake = selectedMakes.join(',');
+        handleMakeChange(value) {
+            this.state.selectedMake = value;
+            this.state.selectedModel = ''; // Reset model
+            this.state.selectedYear = ''; // Reset year
             this.state.page = 1;
-
-            // Update model options based on selected makes
-            this.updateModelOptions(selectedMakes);
 
             // Clear model and year selections
-            this.clearLowerLevelSelections(['model', 'year']);
+            this.clearRadioGroup('model');
+            this.clearRadioGroup('year');
 
-            // Render results
+            // Update model options based on selected make
+            this.updateModelOptions(value);
+
+            // Update year options (will show years for models of selected make)
+            this.updateYearOptions('');
+
             this.render();
         }
 
-        handleModelChange() {
-            // Get selected models
-            const selectedModels = Array.from(this.sidebar.querySelectorAll('input[name="model"]:checked'))
-                .map(cb => cb.value);
-
-            // Update state
-            this.state.selectedModel = selectedModels.join(',');
+        handleModelChange(value) {
+            this.state.selectedModel = value;
+            this.state.selectedYear = ''; // Reset year
             this.state.page = 1;
 
-            // Update year options based on selected models
-            this.updateYearOptions(selectedModels);
+            // Clear year selection
+            this.clearRadioGroup('year');
 
-            // Clear year selections
-            this.clearLowerLevelSelections(['year']);
+            // Update year options based on selected model
+            this.updateYearOptions(value);
 
-            // Render results
             this.render();
         }
 
-        clearLowerLevelSelections(levels) {
-            levels.forEach(level => {
-                this.sidebar.querySelectorAll(`input[name="${level}"]:checked`).forEach(input => {
-                    input.checked = false;
-                });
+        handleYearChange(value) {
+            this.state.selectedYear = value;
+            this.state.page = 1;
+            this.render();
+        }
+
+        clearRadioGroup(groupName) {
+            const radios = this.sidebar.querySelectorAll(`input[name="${groupName}"]`);
+            radios.forEach(radio => {
+                radio.checked = false;
             });
         }
 
         handleSearchInput(term) {
-            // Clear previous timeout
             if (this.searchTimeout) {
                 clearTimeout(this.searchTimeout);
             }
 
-            // Set new timeout for debouncing
             this.searchTimeout = setTimeout(() => {
                 this.state.searchTerm = term;
                 this.state.page = 1;
 
-                // Update heading
                 if (this.heading) {
                     if (term) {
                         this.heading.textContent = `Search results for "${term}"`;
@@ -841,10 +856,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Update URL without page reload
                 this.updateBrowserUrl(term);
-
-                // Re-render results
                 this.render();
             }, this.searchDelay);
         }
@@ -857,66 +869,81 @@ document.addEventListener('DOMContentLoaded', function() {
                 newUrl = `${baseUrl}?c=${encodeURIComponent(searchTerm)}`;
             }
 
-            // Update browser URL without reloading page
             window.history.replaceState({}, '', newUrl);
         }
 
         getSelectedFilters() {
             return {
-                make: Array.from(this.sidebar.querySelectorAll('input[name="make"]:checked')).map(i => i
-                    .value),
-                model: Array.from(this.sidebar.querySelectorAll('input[name="model"]:checked')).map(i => i
-                    .value),
-                year: Array.from(this.sidebar.querySelectorAll('input[name="year"]:checked')).map(i => i
-                    .value)
+                make: this.state.selectedMake,
+                model: this.state.selectedModel,
+                year: this.state.selectedYear
             };
+        }
+
+        // FIXED: Improved search function to properly filter by title, excerpt, and category names
+        resourceMatchesSearch(resource) {
+            if (!this.state.searchTerm) return true;
+
+            const term = this.state.searchTerm.toLowerCase().trim();
+            if (term === '') return true;
+
+            // Search in title
+            if (resource.title.toLowerCase().includes(term)) {
+                return true;
+            }
+
+            // Search in excerpt
+            if (resource.excerpt.toLowerCase().includes(term)) {
+                return true;
+            }
+
+            // Search in all category names
+            if (resource.all_category_names) {
+                for (const catName of resource.all_category_names) {
+                    if (catName.toLowerCase().includes(term)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         applyFilters(resources) {
             const filters = this.getSelectedFilters();
 
             return resources.filter(resource => {
-                let matches = false;
-
-                // Check each category path in the resource
-                resource.categories.forEach(categoryPath => {
-                    if (categoryPath.length >= 3) {
-                        const [make, model, year] = categoryPath;
-
-                        // Check against selected filters
-                        const makeMatch = filters.make.length === 0 || filters.make
-                            .includes(make.name);
-                        const modelMatch = filters.model.length === 0 || filters.model
-                            .includes(model.name);
-                        const yearMatch = filters.year.length === 0 || filters.year
-                            .includes(year.name);
-
-                        if (makeMatch && modelMatch && yearMatch) {
-                            matches = true;
-                        }
-                    }
-                });
-
-                // Search filter
-                if (matches && this.state.searchTerm) {
-                    const term = this.state.searchTerm.toLowerCase();
-                    const titleMatch = resource.title.toLowerCase().includes(term);
-                    const excerptMatch = resource.excerpt.toLowerCase().includes(term);
-
-                    // Check if any category names match search
-                    let categoryMatch = false;
-                    resource.categories.forEach(categoryPath => {
-                        categoryPath.forEach(cat => {
-                            if (cat.name.toLowerCase().includes(term)) {
-                                categoryMatch = true;
-                            }
-                        });
-                    });
-
-                    matches = titleMatch || excerptMatch || categoryMatch;
+                // First apply search filter
+                if (!this.resourceMatchesSearch(resource)) {
+                    return false;
                 }
 
-                return matches;
+                // If no category filters are selected, return true
+                if (!filters.make && !filters.model && !filters.year) {
+                    return true;
+                }
+
+                // Check category filters
+                let matchesFilter = false;
+
+                if (resource.categories && resource.categories.length > 0) {
+                    resource.categories.forEach(categoryPath => {
+                        if (categoryPath.length >= 3) {
+                            const [make, model, year] = categoryPath;
+
+                            const makeMatch = !filters.make || filters.make === make.name;
+                            const modelMatch = !filters.model || filters.model === model
+                                .name;
+                            const yearMatch = !filters.year || filters.year === year.name;
+
+                            if (makeMatch && modelMatch && yearMatch) {
+                                matchesFilter = true;
+                            }
+                        }
+                    });
+                }
+
+                return matchesFilter;
             });
         }
 
@@ -996,18 +1023,30 @@ document.addEventListener('DOMContentLoaded', function() {
             this.pagEl.innerHTML = html;
         }
 
+        // FIXED: Show multiple years if a resource has multiple year terms
         createResourceCard(resource) {
-            // Get the deepest category (usually the year) for display
-            let makeName = '',
-                modelName = '',
-                yearName = '';
+            // Collect all makes, models, and years from all category paths
+            const makes = new Set();
+            const models = new Set();
+            const years = new Set();
 
-            if (resource.categories.length > 0) {
-                const path = resource.categories[0]; // Take first category path
-                if (path.length >= 1) makeName = path[0].name;
-                if (path.length >= 2) modelName = path[1].name;
-                if (path.length >= 3) yearName = path[2].name;
+            if (resource.categories && resource.categories.length > 0) {
+                resource.categories.forEach(categoryPath => {
+                    if (categoryPath.length >= 1) {
+                        makes.add(categoryPath[0].name);
+                    }
+                    if (categoryPath.length >= 2) {
+                        models.add(categoryPath[1].name);
+                    }
+                    if (categoryPath.length >= 3) {
+                        years.add(categoryPath[2].name);
+                    }
+                });
             }
+
+            const makeList = Array.from(makes).join(', ');
+            const modelList = Array.from(models).join(', ');
+            const yearList = Array.from(years).sort((a, b) => b - a).join(', ');
 
             return `
                 <article class="rf-card">
@@ -1022,9 +1061,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         </h3>
                         <div class="rf-card-excerpt">${resource.excerpt.length > 100 ? resource.excerpt.substring(0, 100) + '...' : resource.excerpt}</div>
                         <div class="rf-card-meta">
-                            ${makeName ? `<span>Make: ${makeName}</span>` : ''}
-                            ${modelName ? `<span>Model: ${modelName}</span>` : ''}
-                            ${yearName ? `<span>Year: ${yearName}</span>` : ''}
+                            ${makeList ? `<span>Make: ${makeList}</span>` : ''}
+                            ${modelList ? `<span>Model: ${modelList}</span>` : ''}
+                            ${yearList ? `<span>Year: ${yearList}</span>` : ''}
                         </div>
                     </div>
                 </article>
@@ -1038,12 +1077,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const pagination = this.paginate(filtered);
             this.state.pages = pagination.pages;
 
-            // Update results
             this.resultsEl.innerHTML = pagination.items.length > 0 ?
                 pagination.items.map(resource => this.createResourceCard(resource)).join('') :
                 '<div class="rf-muted">No resources found matching your criteria.</div>';
 
-            // Update count
             if (this.countEl) {
                 const countText = this.state.searchTerm ?
                     `${pagination.total} result${pagination.total === 1 ? '' : 's'} for "${this.state.searchTerm}"` :
@@ -1051,15 +1088,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.countEl.textContent = countText;
             }
 
-            // Update pagination
             this.renderPagination(pagination);
         }
 
         clearFilters() {
-            // Uncheck all filter checkboxes
-            this.sidebar.querySelectorAll('input[type="checkbox"]:checked').forEach(input => {
-                input.checked = false;
-            });
+            // Clear all radio buttons
+            this.clearRadioGroup('make');
+            this.clearRadioGroup('model');
+            this.clearRadioGroup('year');
 
             // Clear search input
             if (this.searchInput) {
@@ -1070,29 +1106,20 @@ document.addEventListener('DOMContentLoaded', function() {
             this.state.searchTerm = '';
             this.state.selectedMake = '';
             this.state.selectedModel = '';
+            this.state.selectedYear = '';
             this.state.page = 1;
 
-            // Update heading
             if (this.heading) {
                 this.heading.textContent = 'Browse All Resources';
             }
 
-            // Clear URL parameter
             this.updateBrowserUrl('');
 
             // Reset filter options to show all
-            this.resetAllFilterOptions();
+            this.updateModelOptions('');
+            this.updateYearOptions('');
 
-            // Re-render
             this.render();
-        }
-
-        resetAllFilterOptions() {
-            // Reset model options to show all models
-            this.updateModelOptions([]);
-
-            // Reset year options to show all years
-            this.updateYearOptions([]);
         }
 
         async fetchResources() {
@@ -1107,16 +1134,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     link: resource.link,
                     date: resource.date,
                     image: resource.featured_image_url || '',
-                    categories: resource.resource_categories || []
+                    categories: resource.resource_categories || [],
+                    all_category_names: resource.all_category_names || [] // For search
                 }));
 
-                // Build hierarchical taxonomy data
                 this.buildTaxonomyData();
-
-                // Populate filter options
                 this.populateMakeOptions();
-                this.updateModelOptions([]); // Initially show all models
-                this.updateYearOptions([]); // Initially show all years
+                this.updateModelOptions('');
+                this.updateYearOptions('');
 
                 this.render();
 
@@ -1133,41 +1158,39 @@ document.addEventListener('DOMContentLoaded', function() {
             const yearsByModel = {};
 
             this.resources.forEach(resource => {
-                resource.categories.forEach(categoryPath => {
-                    if (categoryPath.length >= 1) {
-                        const make = categoryPath[0];
-                        makes.add(make.name);
+                if (resource.categories) {
+                    resource.categories.forEach(categoryPath => {
+                        if (categoryPath.length >= 1) {
+                            const make = categoryPath[0];
+                            makes.add(make.name);
 
-                        if (categoryPath.length >= 2) {
-                            const model = categoryPath[1];
+                            if (categoryPath.length >= 2) {
+                                const model = categoryPath[1];
 
-                            // Add model to make
-                            if (!modelsByMake[make.name]) {
-                                modelsByMake[make.name] = new Set();
-                            }
-                            modelsByMake[make.name].add(model.name);
-
-                            if (categoryPath.length >= 3) {
-                                const year = categoryPath[2];
-
-                                // Add year to model
-                                if (!yearsByModel[model.name]) {
-                                    yearsByModel[model.name] = new Set();
+                                if (!modelsByMake[make.name]) {
+                                    modelsByMake[make.name] = new Set();
                                 }
-                                yearsByModel[model.name].add(year.name);
+                                modelsByMake[make.name].add(model.name);
+
+                                if (categoryPath.length >= 3) {
+                                    const year = categoryPath[2];
+
+                                    if (!yearsByModel[model.name]) {
+                                        yearsByModel[model.name] = new Set();
+                                    }
+                                    yearsByModel[model.name].add(year.name);
+                                }
                             }
                         }
-                    }
-                });
+                    });
+                }
             });
 
-            // Convert Sets to arrays and sort
             this.taxonomyData = {
                 makes: Array.from(makes).sort(),
                 modelsByMake: Object.fromEntries(
                     Object.entries(modelsByMake).map(([key, value]) => [key, Array.from(value)
-                        .sort()
-                    ])
+                    .sort()])
                 ),
                 yearsByModel: Object.fromEntries(
                     Object.entries(yearsByModel).map(([key, value]) => [key, Array.from(value).sort(
@@ -1180,80 +1203,90 @@ document.addEventListener('DOMContentLoaded', function() {
             const makeContainer = this.sidebar.querySelector('[data-role="make-options"]');
             if (!makeContainer) return;
 
-            makeContainer.innerHTML = this.taxonomyData.makes.map(make => `
-                <label class="rf-check">
-                    <input type="checkbox" name="make" value="${make}">
-                    ${make}
-                </label>
-            `).join('');
+            let html = '';
+
+            this.taxonomyData.makes.forEach(make => {
+                html += `
+                    <label class="rf-radio">
+                        <input type="radio" name="make" value="${make}">
+                        ${make}
+                    </label>
+                `;
+            });
+
+            makeContainer.innerHTML = html;
         }
 
-        updateModelOptions(selectedMakes) {
+        updateModelOptions(selectedMake) {
             const modelContainer = this.sidebar.querySelector('[data-role="model-options"]');
             if (!modelContainer) return;
 
-            let availableModels = new Set();
+            let html = '';
 
-            if (selectedMakes.length === 0) {
-                // If no make selected, show all models
-                Object.values(this.taxonomyData.modelsByMake).forEach(models => {
-                    models.forEach(model => availableModels.add(model));
+            if (selectedMake && this.taxonomyData.modelsByMake[selectedMake]) {
+                // Show only models for the selected make
+                this.taxonomyData.modelsByMake[selectedMake].forEach(model => {
+                    html += `
+                        <label class="rf-radio">
+                            <input type="radio" name="model" value="${model}">
+                            ${model}
+                        </label>
+                    `;
                 });
             } else {
-                // Show only models from selected makes
-                selectedMakes.forEach(make => {
-                    if (this.taxonomyData.modelsByMake[make]) {
-                        this.taxonomyData.modelsByMake[make].forEach(model =>
-                            availableModels.add(model)
-                        );
-                    }
+                // Show all models if no make selected
+                const allModels = new Set();
+                Object.values(this.taxonomyData.modelsByMake).forEach(models => {
+                    models.forEach(model => allModels.add(model));
+                });
+
+                Array.from(allModels).sort().forEach(model => {
+                    html += `
+                        <label class="rf-radio">
+                            <input type="radio" name="model" value="${model}">
+                            ${model}
+                        </label>
+                    `;
                 });
             }
 
-            // Sort models alphabetically
-            const sortedModels = Array.from(availableModels).sort();
-
-            // Generate HTML with checkboxes
-            modelContainer.innerHTML = sortedModels.map(model => `
-                <label class="rf-check">
-                    <input type="checkbox" name="model" value="${model}">
-                    ${model}
-                </label>
-            `).join('');
+            modelContainer.innerHTML = html;
         }
 
-        updateYearOptions(selectedModels) {
+        updateYearOptions(selectedModel) {
             const yearContainer = this.sidebar.querySelector('[data-role="year-options"]');
             if (!yearContainer) return;
 
-            let availableYears = new Set();
+            let html = '';
 
-            if (selectedModels.length === 0) {
-                // If no model selected, show years from all models
-                Object.values(this.taxonomyData.yearsByModel).forEach(years => {
-                    years.forEach(year => availableYears.add(year));
+            if (selectedModel && this.taxonomyData.yearsByModel[selectedModel]) {
+                // Show only years for the selected model
+                this.taxonomyData.yearsByModel[selectedModel].forEach(year => {
+                    html += `
+                        <label class="rf-radio">
+                            <input type="radio" name="year" value="${year}">
+                            ${year}
+                        </label>
+                    `;
                 });
             } else {
-                // Show only years from selected models
-                selectedModels.forEach(model => {
-                    if (this.taxonomyData.yearsByModel[model]) {
-                        this.taxonomyData.yearsByModel[model].forEach(year =>
-                            availableYears.add(year)
-                        );
-                    }
+                // Show all years if no model selected
+                const allYears = new Set();
+                Object.values(this.taxonomyData.yearsByModel).forEach(years => {
+                    years.forEach(year => allYears.add(year));
+                });
+
+                Array.from(allYears).sort((a, b) => b - a).forEach(year => {
+                    html += `
+                        <label class="rf-radio">
+                            <input type="radio" name="year" value="${year}">
+                            ${year}
+                        </label>
+                    `;
                 });
             }
 
-            // Sort years descending (newest first)
-            const sortedYears = Array.from(availableYears).sort((a, b) => b - a);
-
-            // Generate HTML with checkboxes
-            yearContainer.innerHTML = sortedYears.map(year => `
-                <label class="rf-check">
-                    <input type="checkbox" name="year" value="${year}">
-                    ${year}
-                </label>
-            `).join('');
+            yearContainer.innerHTML = html;
         }
     }
 
@@ -1275,7 +1308,6 @@ function ajax_resource_filter_archive_template($template) {
         if (file_exists($plugin_template)) {
             return $plugin_template;
         }
-        // Fallback to shortcode in content
         add_filter('the_content', 'ajax_resource_filter_archive_content');
     }
     return $template;
