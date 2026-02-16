@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: AJAX Resource Filter with Taxonomy
- * Description: Custom resource post type with AJAX filtering by taxonomy and search
- * Version: 1.4
+ * Description: Custom resource post type with AJAX filtering by hierarchical taxonomy (Make → Model → Year)
+ * Version: 2.0
  * Author: Towfique Elahe
  * Author URI: https://towfiqueelahe.com/
  */
@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Register custom post type and taxonomies
+// Register custom post type and hierarchical taxonomy
 add_action('init', 'ajax_resource_filter_register_cpt');
 function ajax_resource_filter_register_cpt() {
     // Register Resource post type
@@ -37,69 +37,26 @@ function ajax_resource_filter_register_cpt() {
         'show_in_rest' => true,
     ]);
 
-    // Register Resource Make taxonomy
-    register_taxonomy('resource-make', 'resource', [
+    // Register hierarchical Resource Category taxonomy (Make → Model → Year)
+    register_taxonomy('resource-category', 'resource', [
         'labels' => [
-            'name' => 'Makes',
-            'singular_name' => 'Make',
-            'search_items' => 'Search Makes',
-            'all_items' => 'All Makes',
+            'name' => 'Resource Categories',
+            'singular_name' => 'Resource Category',
+            'search_items' => 'Search Categories',
+            'all_items' => 'All Categories',
             'parent_item' => 'Parent Make',
             'parent_item_colon' => 'Parent Make:',
-            'edit_item' => 'Edit Make',
-            'update_item' => 'Update Make',
-            'add_new_item' => 'Add New Make',
-            'new_item_name' => 'New Make Name',
+            'edit_item' => 'Edit Category',
+            'update_item' => 'Update Category',
+            'add_new_item' => 'Add New Category',
+            'new_item_name' => 'New Category Name',
+            'menu_name' => 'Categories',
         ],
-        'hierarchical' => false,
+        'hierarchical' => true, // This enables parent/child relationships
         'show_ui' => true,
         'show_admin_column' => true,
         'query_var' => true,
-        'rewrite' => ['slug' => 'resource-make'],
-        'show_in_rest' => true,
-    ]);
-
-    // Register Resource Model taxonomy
-    register_taxonomy('resource-model', 'resource', [
-        'labels' => [
-            'name' => 'Models',
-            'singular_name' => 'Model',
-            'search_items' => 'Search Models',
-            'all_items' => 'All Models',
-            'parent_item' => 'Parent Model',
-            'parent_item_colon' => 'Parent Model:',
-            'edit_item' => 'Edit Model',
-            'update_item' => 'Update Model',
-            'add_new_item' => 'Add New Model',
-            'new_item_name' => 'New Model Name',
-        ],
-        'hierarchical' => false,
-        'show_ui' => true,
-        'show_admin_column' => true,
-        'query_var' => true,
-        'rewrite' => ['slug' => 'resource-model'],
-        'show_in_rest' => true,
-    ]);
-
-    // Register Resource Year taxonomy
-    register_taxonomy('resource-year', 'resource', [
-        'labels' => [
-            'name' => 'Years',
-            'singular_name' => 'Year',
-            'search_items' => 'Search Years',
-            'all_items' => 'All Years',
-            'parent_item' => 'Parent Year',
-            'parent_item_colon' => 'Parent Year:',
-            'edit_item' => 'Edit Year',
-            'update_item' => 'Update Year',
-            'add_new_item' => 'Add New Year',
-            'new_item_name' => 'New Year Name',
-        ],
-        'hierarchical' => false,
-        'show_ui' => true,
-        'show_admin_column' => true,
-        'query_var' => true,
-        'rewrite' => ['slug' => 'resource-year'],
+        'rewrite' => ['slug' => 'resource-category', 'hierarchical' => true],
         'show_in_rest' => true,
     ]);
 }
@@ -121,54 +78,41 @@ function ajax_resource_filter_activate() {
 // Register REST API fields
 add_action('rest_api_init', 'ajax_resource_filter_register_rest_fields');
 function ajax_resource_filter_register_rest_fields() {
-    // Add taxonomies to REST response
-    register_rest_field('resource', 'resource_makes', [
+    // Add hierarchical taxonomy data to REST response
+    register_rest_field('resource', 'resource_categories', [
         'get_callback' => function($object) {
-            $terms = get_the_terms($object['id'], 'resource-make');
+            $terms = get_the_terms($object['id'], 'resource-category');
             if (empty($terms) || is_wp_error($terms)) {
                 return [];
             }
-            return array_map(function ($t) {
-                return [
-                    'id' => $t->term_id,
-                    'name' => $t->name,
-                    'slug' => $t->slug,
-                ];
-            }, $terms);
-        },
-        'schema' => ['type' => 'array'],
-    ]);
-
-    register_rest_field('resource', 'resource_models', [
-        'get_callback' => function($object) {
-            $terms = get_the_terms($object['id'], 'resource-model');
-            if (empty($terms) || is_wp_error($terms)) {
-                return [];
+            
+            $formatted_terms = [];
+            foreach ($terms as $term) {
+                // Get the full hierarchy for this term
+                $hierarchy = [];
+                $current_term = $term;
+                
+                // Build path from term up to root
+                while ($current_term) {
+                    $hierarchy[] = [
+                        'id' => $current_term->term_id,
+                        'name' => $current_term->name,
+                        'slug' => $current_term->slug,
+                        'parent' => $current_term->parent
+                    ];
+                    
+                    if ($current_term->parent) {
+                        $current_term = get_term($current_term->parent, 'resource-category');
+                    } else {
+                        $current_term = null;
+                    }
+                }
+                
+                // Reverse to get Make → Model → Year order
+                $formatted_terms[] = array_reverse($hierarchy);
             }
-            return array_map(function ($t) {
-                return [
-                    'id' => $t->term_id,
-                    'name' => $t->name,
-                    'slug' => $t->slug,
-                ];
-            }, $terms);
-        },
-        'schema' => ['type' => 'array'],
-    ]);
-
-    register_rest_field('resource', 'resource_years', [
-        'get_callback' => function($object) {
-            $terms = get_the_terms($object['id'], 'resource-year');
-            if (empty($terms) || is_wp_error($terms)) {
-                return [];
-            }
-            return array_map(function ($t) {
-                return [
-                    'id' => $t->term_id,
-                    'name' => $t->name,
-                    'slug' => $t->slug,
-                ];
-            }, $terms);
+            
+            return $formatted_terms;
         },
         'schema' => ['type' => 'array'],
     ]);
@@ -224,7 +168,7 @@ function ajax_resource_filter_shortcode($atts) {
                     <button data-action="clear">Clear filters</button>
                 </h4>
 
-                <!-- Search moved to sidebar -->
+                <!-- Search in sidebar -->
                 <div class="rf-searchbar">
                     <form id="rfSearchForm" method="get" action="<?php echo esc_url(home_url('/resources/')); ?>">
                         <input type="text" name="c" id="rfSearchInput" placeholder="Search resources..."
@@ -236,7 +180,7 @@ function ajax_resource_filter_shortcode($atts) {
                 </div>
 
                 <div class="rf-filter-container">
-                    <!-- Make Filter (First) -->
+                    <!-- Make Filter (Level 1) -->
                     <div class="rf-fgroup" data-group="make">
                         <div class="rf-fhead" data-toggle="make-options">
                             <span>Car Make</span>
@@ -246,11 +190,11 @@ function ajax_resource_filter_shortcode($atts) {
                             </svg>
                         </div>
                         <div class="rf-fbody" data-role="make-options">
-                            <!-- Will be populated by JavaScript -->
+                            <!-- Will be populated by JavaScript with parent terms only -->
                         </div>
                     </div>
 
-                    <!-- Model Filter (Second) -->
+                    <!-- Model Filter (Level 2) -->
                     <div class="rf-fgroup" data-group="model">
                         <div class="rf-fhead" data-toggle="model-options">
                             <span>Car Model</span>
@@ -260,11 +204,11 @@ function ajax_resource_filter_shortcode($atts) {
                             </svg>
                         </div>
                         <div class="rf-fbody" data-role="model-options">
-                            <!-- Will be populated by JavaScript -->
+                            <!-- Will be populated dynamically based on selected make -->
                         </div>
                     </div>
 
-                    <!-- Year Filter (Third) -->
+                    <!-- Year Filter (Level 3) -->
                     <div class="rf-fgroup" data-group="year">
                         <div class="rf-fhead" data-toggle="year-options">
                             <span>Year of Make</span>
@@ -274,7 +218,7 @@ function ajax_resource_filter_shortcode($atts) {
                             </svg>
                         </div>
                         <div class="rf-fbody" data-role="year-options">
-                            <!-- Will be populated by JavaScript -->
+                            <!-- Will be populated dynamically based on selected make and model -->
                         </div>
                     </div>
                 </div>
@@ -472,6 +416,11 @@ function ajax_resource_filter_shortcode($atts) {
 .rf-check input {
     accent-color: var(--e-global-color-primary);
     margin-right: 10px;
+}
+
+.rf-check.disabled {
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 .rf-toolbar {
@@ -692,7 +641,7 @@ function ajax_resource_filter_shortcode($atts) {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Main Resource Filter Component
+    // Main Resource Filter Component with Hierarchical Taxonomy
     class ResourceFilter {
         constructor(root) {
             this.root = root;
@@ -708,12 +657,20 @@ document.addEventListener('DOMContentLoaded', function() {
             this.heading = root.querySelector('.rf-heading');
 
             this.resources = [];
+            this.taxonomyData = {
+                makes: [], // Parent terms
+                modelsByMake: {}, // Child terms by parent make
+                yearsByModel: {} // Grandchild terms by parent model
+            };
+
             this.state = {
                 page: 1,
                 perPage: parseInt('<?php echo $atts["posts_per_page"]; ?>') || 12,
                 sort: 'date_desc',
                 pages: 1,
-                searchTerm: '<?php echo esc_js($search_term); ?>'
+                searchTerm: '<?php echo esc_js($search_term); ?>',
+                selectedMake: '',
+                selectedModel: ''
             };
 
             // Search debouncing
@@ -743,10 +700,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
-            // Filter changes
+            // Filter changes - using event delegation for dynamically created checkboxes
             if (this.sidebar) {
                 this.sidebar.addEventListener('change', (e) => {
-                    if (e.target.matches('input[type="checkbox"]')) {
+                    if (e.target.matches('input[name="make"]')) {
+                        this.handleMakeChange();
+                    }
+
+                    if (e.target.matches('input[name="model"]')) {
+                        this.handleModelChange();
+                    }
+
+                    if (e.target.matches('input[name="year"]')) {
                         this.state.page = 1;
                         this.render();
                     }
@@ -810,6 +775,52 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        handleMakeChange() {
+            // Get selected makes
+            const selectedMakes = Array.from(this.sidebar.querySelectorAll('input[name="make"]:checked'))
+                .map(cb => cb.value);
+
+            // Update state
+            this.state.selectedMake = selectedMakes.join(',');
+            this.state.page = 1;
+
+            // Update model options based on selected makes
+            this.updateModelOptions(selectedMakes);
+
+            // Clear model and year selections
+            this.clearLowerLevelSelections(['model', 'year']);
+
+            // Render results
+            this.render();
+        }
+
+        handleModelChange() {
+            // Get selected models
+            const selectedModels = Array.from(this.sidebar.querySelectorAll('input[name="model"]:checked'))
+                .map(cb => cb.value);
+
+            // Update state
+            this.state.selectedModel = selectedModels.join(',');
+            this.state.page = 1;
+
+            // Update year options based on selected models
+            this.updateYearOptions(selectedModels);
+
+            // Clear year selections
+            this.clearLowerLevelSelections(['year']);
+
+            // Render results
+            this.render();
+        }
+
+        clearLowerLevelSelections(levels) {
+            levels.forEach(level => {
+                this.sidebar.querySelectorAll(`input[name="${level}"]:checked`).forEach(input => {
+                    input.checked = false;
+                });
+            });
+        }
+
         handleSearchInput(term) {
             // Clear previous timeout
             if (this.searchTimeout) {
@@ -830,7 +841,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // Update URL without page reload (optional - adds to browser history)
+                // Update URL without page reload
                 this.updateBrowserUrl(term);
 
                 // Re-render results
@@ -850,66 +861,62 @@ document.addEventListener('DOMContentLoaded', function() {
             window.history.replaceState({}, '', newUrl);
         }
 
-        getFilters() {
-            const filters = {};
-            ['make', 'model', 'year'].forEach(group => {
-                const inputs = this.sidebar.querySelectorAll(`input[name="${group}"]:checked`);
-                filters[group] = Array.from(inputs).map(input => input.value);
-            });
-            return filters;
+        getSelectedFilters() {
+            return {
+                make: Array.from(this.sidebar.querySelectorAll('input[name="make"]:checked')).map(i => i
+                    .value),
+                model: Array.from(this.sidebar.querySelectorAll('input[name="model"]:checked')).map(i => i
+                    .value),
+                year: Array.from(this.sidebar.querySelectorAll('input[name="year"]:checked')).map(i => i
+                    .value)
+            };
         }
 
         applyFilters(resources) {
-            const filters = this.getFilters();
+            const filters = this.getSelectedFilters();
 
             return resources.filter(resource => {
-                // Make filter
-                if (filters.make.length > 0) {
-                    const resourceMakes = resource.makes.map(m => m.name);
-                    if (!filters.make.some(make => resourceMakes.includes(make))) {
-                        return false;
-                    }
-                }
+                let matches = false;
 
-                // Model filter
-                if (filters.model.length > 0) {
-                    const resourceModels = resource.models.map(m => m.name);
-                    if (!filters.model.some(model => resourceModels.includes(model))) {
-                        return false;
-                    }
-                }
+                // Check each category path in the resource
+                resource.categories.forEach(categoryPath => {
+                    if (categoryPath.length >= 3) {
+                        const [make, model, year] = categoryPath;
 
-                // Year filter
-                if (filters.year.length > 0) {
-                    const resourceYears = resource.years.map(y => y.name);
-                    if (!filters.year.some(year => resourceYears.includes(year))) {
-                        return false;
+                        // Check against selected filters
+                        const makeMatch = filters.make.length === 0 || filters.make
+                            .includes(make.name);
+                        const modelMatch = filters.model.length === 0 || filters.model
+                            .includes(model.name);
+                        const yearMatch = filters.year.length === 0 || filters.year
+                            .includes(year.name);
+
+                        if (makeMatch && modelMatch && yearMatch) {
+                            matches = true;
+                        }
                     }
-                }
+                });
 
                 // Search filter
-                if (this.state.searchTerm) {
+                if (matches && this.state.searchTerm) {
                     const term = this.state.searchTerm.toLowerCase();
                     const titleMatch = resource.title.toLowerCase().includes(term);
                     const excerptMatch = resource.excerpt.toLowerCase().includes(term);
 
-                    // Also search in make, model, and year names
-                    const makeMatch = resource.makes.some(m =>
-                        m.name.toLowerCase().includes(term)
-                    );
-                    const modelMatch = resource.models.some(m =>
-                        m.name.toLowerCase().includes(term)
-                    );
-                    const yearMatch = resource.years.some(y =>
-                        y.name.toLowerCase().includes(term)
-                    );
+                    // Check if any category names match search
+                    let categoryMatch = false;
+                    resource.categories.forEach(categoryPath => {
+                        categoryPath.forEach(cat => {
+                            if (cat.name.toLowerCase().includes(term)) {
+                                categoryMatch = true;
+                            }
+                        });
+                    });
 
-                    if (!(titleMatch || excerptMatch || makeMatch || modelMatch || yearMatch)) {
-                        return false;
-                    }
+                    matches = titleMatch || excerptMatch || categoryMatch;
                 }
 
-                return true;
+                return matches;
             });
         }
 
@@ -961,9 +968,9 @@ document.addEventListener('DOMContentLoaded', function() {
             start = Math.max(1, end - 4);
 
             let html = `
-                    <button class="rf-pagebtn" data-page="${this.state.page - 1}" ${prevDisabled}>
-                        ← Previous
-                    </button>`;
+                <button class="rf-pagebtn" data-page="${this.state.page - 1}" ${prevDisabled}>
+                    ← Previous
+                </button>`;
 
             if (start > 1) {
                 html += `<button class="rf-pagebtn" data-page="1">1</button>`;
@@ -982,43 +989,46 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             html += `
-                    <button class="rf-pagebtn" data-page="${this.state.page + 1}" ${nextDisabled}>
-                        Next →
-                    </button>`;
+                <button class="rf-pagebtn" data-page="${this.state.page + 1}" ${nextDisabled}>
+                    Next →
+                </button>`;
 
             this.pagEl.innerHTML = html;
         }
 
         createResourceCard(resource) {
-            const makes = resource.makes.map(m => m.name).join(', ');
-            const models = resource.models.map(m => m.name).join(', ');
-            const years = resource.years.map(y => y.name).join(', ');
-            const date = new Date(resource.date).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            });
+            // Get the deepest category (usually the year) for display
+            let makeName = '',
+                modelName = '',
+                yearName = '';
+
+            if (resource.categories.length > 0) {
+                const path = resource.categories[0]; // Take first category path
+                if (path.length >= 1) makeName = path[0].name;
+                if (path.length >= 2) modelName = path[1].name;
+                if (path.length >= 3) yearName = path[2].name;
+            }
 
             return `
-                    <article class="rf-card">
-                        ${resource.image ? `
-                            <a class="rf-card-image" href="${resource.link}">
-                                <img src="${resource.image}" alt="${resource.title}">
-                            </a>
-                        ` : ''}
-                        <div class="rf-card-content">
-                            <h3 class="rf-card-title">
-                                <a href="${resource.link}">${resource.title}</a>
-                            </h3>
-                            <div class="rf-card-excerpt">${resource.excerpt.length > 100 ? resource.excerpt.substring(0, 100) + '...' : resource.excerpt}</div>
-                            <div class="rf-card-meta">
-                                ${makes ? `<span>Make: ${makes}</span>` : ''}
-                                ${models ? `<span>Model: ${models}</span>` : ''}
-                                ${years ? `<span>Year: ${years}</span>` : ''}
-                            </div>
+                <article class="rf-card">
+                    ${resource.image ? `
+                        <a class="rf-card-image" href="${resource.link}">
+                            <img src="${resource.image}" alt="${resource.title}">
+                        </a>
+                    ` : ''}
+                    <div class="rf-card-content">
+                        <h3 class="rf-card-title">
+                            <a href="${resource.link}">${resource.title}</a>
+                        </h3>
+                        <div class="rf-card-excerpt">${resource.excerpt.length > 100 ? resource.excerpt.substring(0, 100) + '...' : resource.excerpt}</div>
+                        <div class="rf-card-meta">
+                            ${makeName ? `<span>Make: ${makeName}</span>` : ''}
+                            ${modelName ? `<span>Model: ${modelName}</span>` : ''}
+                            ${yearName ? `<span>Year: ${yearName}</span>` : ''}
                         </div>
-                    </article>
-                `;
+                    </div>
+                </article>
+            `;
         }
 
         render() {
@@ -1058,6 +1068,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Reset state
             this.state.searchTerm = '';
+            this.state.selectedMake = '';
+            this.state.selectedModel = '';
             this.state.page = 1;
 
             // Update heading
@@ -1068,8 +1080,19 @@ document.addEventListener('DOMContentLoaded', function() {
             // Clear URL parameter
             this.updateBrowserUrl('');
 
+            // Reset filter options to show all
+            this.resetAllFilterOptions();
+
             // Re-render
             this.render();
+        }
+
+        resetAllFilterOptions() {
+            // Reset model options to show all models
+            this.updateModelOptions([]);
+
+            // Reset year options to show all years
+            this.updateYearOptions([]);
         }
 
         async fetchResources() {
@@ -1084,13 +1107,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     link: resource.link,
                     date: resource.date,
                     image: resource.featured_image_url || '',
-                    makes: resource.resource_makes || [],
-                    models: resource.resource_models || [],
-                    years: resource.resource_years || []
+                    categories: resource.resource_categories || []
                 }));
 
-                // Populate filter options in order: Make, Model, Year
-                this.populateFilterOptions();
+                // Build hierarchical taxonomy data
+                this.buildTaxonomyData();
+
+                // Populate filter options
+                this.populateMakeOptions();
+                this.updateModelOptions([]); // Initially show all models
+                this.updateYearOptions([]); // Initially show all years
+
                 this.render();
 
             } catch (error) {
@@ -1100,54 +1127,133 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        populateFilterOptions() {
-            // Collect all unique makes, models, and years
-            const allMakes = new Set();
-            const allModels = new Set();
-            const allYears = new Set();
+        buildTaxonomyData() {
+            const makes = new Set();
+            const modelsByMake = {};
+            const yearsByModel = {};
 
             this.resources.forEach(resource => {
-                resource.makes.forEach(make => allMakes.add(make.name));
-                resource.models.forEach(model => allModels.add(model.name));
-                resource.years.forEach(year => allYears.add(year.name));
+                resource.categories.forEach(categoryPath => {
+                    if (categoryPath.length >= 1) {
+                        const make = categoryPath[0];
+                        makes.add(make.name);
+
+                        if (categoryPath.length >= 2) {
+                            const model = categoryPath[1];
+
+                            // Add model to make
+                            if (!modelsByMake[make.name]) {
+                                modelsByMake[make.name] = new Set();
+                            }
+                            modelsByMake[make.name].add(model.name);
+
+                            if (categoryPath.length >= 3) {
+                                const year = categoryPath[2];
+
+                                // Add year to model
+                                if (!yearsByModel[model.name]) {
+                                    yearsByModel[model.name] = new Set();
+                                }
+                                yearsByModel[model.name].add(year.name);
+                            }
+                        }
+                    }
+                });
             });
 
-            // Populate make filter (first)
+            // Convert Sets to arrays and sort
+            this.taxonomyData = {
+                makes: Array.from(makes).sort(),
+                modelsByMake: Object.fromEntries(
+                    Object.entries(modelsByMake).map(([key, value]) => [key, Array.from(value)
+                        .sort()
+                    ])
+                ),
+                yearsByModel: Object.fromEntries(
+                    Object.entries(yearsByModel).map(([key, value]) => [key, Array.from(value).sort(
+                        (a, b) => b - a)])
+                )
+            };
+        }
+
+        populateMakeOptions() {
             const makeContainer = this.sidebar.querySelector('[data-role="make-options"]');
-            if (makeContainer) {
-                const sortedMakes = Array.from(allMakes).sort();
-                makeContainer.innerHTML = sortedMakes.map(make => `
-                        <label class="rf-check">
-                            <input type="checkbox" name="make" value="${make}">
-                            ${make}
-                        </label>
-                    `).join('');
-            }
+            if (!makeContainer) return;
 
-            // Populate model filter (second)
+            makeContainer.innerHTML = this.taxonomyData.makes.map(make => `
+                <label class="rf-check">
+                    <input type="checkbox" name="make" value="${make}">
+                    ${make}
+                </label>
+            `).join('');
+        }
+
+        updateModelOptions(selectedMakes) {
             const modelContainer = this.sidebar.querySelector('[data-role="model-options"]');
-            if (modelContainer) {
-                const sortedModels = Array.from(allModels).sort();
-                modelContainer.innerHTML = sortedModels.map(model => `
-                        <label class="rf-check">
-                            <input type="checkbox" name="model" value="${model}">
-                            ${model}
-                        </label>
-                    `).join('');
+            if (!modelContainer) return;
+
+            let availableModels = new Set();
+
+            if (selectedMakes.length === 0) {
+                // If no make selected, show all models
+                Object.values(this.taxonomyData.modelsByMake).forEach(models => {
+                    models.forEach(model => availableModels.add(model));
+                });
+            } else {
+                // Show only models from selected makes
+                selectedMakes.forEach(make => {
+                    if (this.taxonomyData.modelsByMake[make]) {
+                        this.taxonomyData.modelsByMake[make].forEach(model =>
+                            availableModels.add(model)
+                        );
+                    }
+                });
             }
 
-            // Populate year filter (third)
+            // Sort models alphabetically
+            const sortedModels = Array.from(availableModels).sort();
+
+            // Generate HTML with checkboxes
+            modelContainer.innerHTML = sortedModels.map(model => `
+                <label class="rf-check">
+                    <input type="checkbox" name="model" value="${model}">
+                    ${model}
+                </label>
+            `).join('');
+        }
+
+        updateYearOptions(selectedModels) {
             const yearContainer = this.sidebar.querySelector('[data-role="year-options"]');
-            if (yearContainer) {
-                const sortedYears = Array.from(allYears).sort((a, b) => b -
-                a); // Sort years descending (newest first)
-                yearContainer.innerHTML = sortedYears.map(year => `
-                        <label class="rf-check">
-                            <input type="checkbox" name="year" value="${year}">
-                            ${year}
-                        </label>
-                    `).join('');
+            if (!yearContainer) return;
+
+            let availableYears = new Set();
+
+            if (selectedModels.length === 0) {
+                // If no model selected, show years from all models
+                Object.values(this.taxonomyData.yearsByModel).forEach(years => {
+                    years.forEach(year => availableYears.add(year));
+                });
+            } else {
+                // Show only years from selected models
+                selectedModels.forEach(model => {
+                    if (this.taxonomyData.yearsByModel[model]) {
+                        this.taxonomyData.yearsByModel[model].forEach(year =>
+                            availableYears.add(year)
+                        );
+                    }
+                });
             }
+
+            // Sort years descending (newest first)
+            const sortedYears = Array.from(availableYears).sort((a, b) => b - a);
+
+            // Generate HTML with checkboxes
+            yearContainer.innerHTML = sortedYears.map(year => `
+                <label class="rf-check">
+                    <input type="checkbox" name="year" value="${year}">
+                    ${year}
+                </label>
+            `).join('');
         }
     }
 
